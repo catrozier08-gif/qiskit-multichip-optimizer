@@ -1,18 +1,16 @@
-Quick start python example_usage.py
-
 # Qiskit Multi-Chip Placement Optimizer
 
-A hardware-aware qubit placement and abstract routing optimizer for modular multi-chip quantum architectures.
+A hardware-aware qubit layout and abstract routing optimizer for modular multi-chip quantum architectures.
 
-This project targets a key scaling problem in modular quantum systems: minimizing expensive inter-chip communication while respecting chip capacities and hardware topology.
+This project explores a key scaling problem in modular quantum systems: minimizing expensive inter-chip communication while respecting chip capacities and hardware topology.
 
 ## What it does
 
 Given a `Qiskit QuantumCircuit` and a multi-chip hardware graph, the optimizer:
 
 1. Builds a weighted logical interaction graph from 2-qubit gates
-2. Generates a topology-aware initial qubit placement using graph communities
-3. Refines placement with fast local move/swap search
+2. Generates a topology-aware initial qubit layout using graph communities
+3. Refines layout with fast local move/swap search
 4. Produces an abstract routed circuit with explicit inter-chip communication-hop markers
 5. Reports communication cost, hop count, routing latency, and modeled success probability
 
@@ -30,12 +28,12 @@ can significantly improve execution quality compared to naive mapping.
 
 ## Current model
 
-This is a **prototype placement + abstract routing framework**, not a hardware-exact transpiler.
+This is a **prototype layout + abstract routing framework**, not a hardware-exact transpiler pass.
 
 It currently supports:
 - arbitrary weighted chip graphs
 - chip capacity constraints
-- communication-cost-aware placement
+- communication-cost-aware layout
 - path-aware shortest-hop routing annotations
 - estimated latency/fidelity metrics
 - synthetic benchmark evaluation across multiple topologies
@@ -49,7 +47,7 @@ The circuit is converted into a weighted qubit interaction graph where edge weig
 Highly interacting logical qubits are clustered and assigned to chips using a topology-aware community placement heuristic.
 
 ### 3. Fast local refinement
-A move/swap local search improves the placement under chip-capacity constraints.
+A move/swap local search improves the layout under chip-capacity constraints.
 
 ### 4. Path-aware abstract routing
 For each remote interaction, the tool emits one abstract communication-hop marker per chip-to-chip edge traversed along the shortest hardware path.
@@ -63,6 +61,14 @@ The optimizer reports:
 - average hops per remote gate
 - average latency per remote gate
 - modeled success probability
+
+## Public-facing API
+
+The cleaner ecosystem-facing wrapper is:
+
+- `ModularLayoutOptimizer.analyze(...)`
+- `ModularLayoutOptimizer.run(...)`
+- `ModularLayoutOptimizer.baseline_report(...)`
 
 ## Example benchmark results
 
@@ -89,59 +95,7 @@ Benchmarks were run on 120-qubit clustered synthetic circuits mapped to 4-chip m
 ### Success probability trend
 Modeled success probability improved substantially relative to naive placement across all tested topologies.
 
-## Example usage
+## Quick start
 
-```python
-topology = build_line_topology()
-circuit = create_clustered_test_circuit(num_qubits=120, num_clusters=4, num_gates=400, seed=0)
-
-optimizer = MultiChipPlacementOptimizer(topology, max_passes=10)
-result = optimizer.optimize(circuit, routing_mode="path")
-
-optimizer.summarize_result(result)
-
-
-Output includes
-initial placement
-refined placement
-placement metrics
-optionally transformed routed circuit
-routing summary
-Main metrics
-Placement metrics:
-
-communication_cost
-inter_chip_gates
-estimated_success_probability
-total_interchip_hops
-Routing summary:
-
-total_interchip_hop_markers
-total_interchip_latency
-total_interchip_fidelity_factor
-average_latency_per_hop
-average_hops_per_interchip_gate
-average_latency_per_interchip_gate
-Notes
-This project currently uses:
-
-synthetic clustered benchmark circuits
-abstract communication-hop routing markers
-simplified latency/fidelity models
-It should be viewed as a field-aware modular placement/routing prototype, suitable for experimentation, benchmarking, and future integration work.
-
-Roadmap
-Planned next steps include:
-
-stronger benchmark suites
-cleaner package/module organization
-improved integration with Qiskit transpiler flow
-richer topology and communication models
-stronger IBM/backend-facing experiments
-Files
-Suggested project structure:
-
-multichip_optimizer.py — core optimizer code
-requirements.txt — dependencies
-benchmark_results/ — CSV summaries and PNG plots
-notebooks/ — experimental notebooks
+```bash
+python example_usage.py
