@@ -1,101 +1,87 @@
-# Qiskit Multi-Chip Placement Optimizer
+Qiskit Multi-Chip Placement Optimizer
+A prototype hardware-aware qubit layout and abstract routing framework for modular quantum architectures.
 
-A hardware-aware qubit layout and abstract routing optimizer for modular multi-chip quantum architectures.
+Overview
+This project explores qubit placement for modular multi-chip quantum systems, where remote interactions across chips can introduce additional latency, routing overhead, and fidelity loss relative to local operations.
 
-This project explores a key scaling problem in modular quantum systems: minimizing expensive inter-chip communication while respecting chip capacities and hardware topology.
+Given a Qiskit circuit and a weighted chip-level topology graph, the optimizer:
 
-## What it does
+builds a weighted logical interaction graph,
+generates an initial placement using topology-aware community structure,
+refines the layout using local move/swap search, and
+emits an abstract routed circuit annotated with inter-chip communication markers.
+What it does
+Builds a weighted logical interaction graph from 2-qubit gates
+Generates a topology-aware initial placement under chip-capacity constraints
+Refines layouts using fast local move/swap search
+Emits abstract inter-chip routing markers along shortest chip-level paths
+Reports modeled communication and routing metrics
+Important note
+This is a prototype placement and abstract routing tool, not a hardware-exact transpiler pass.
 
-Given a `Qiskit QuantumCircuit` and a multi-chip hardware graph, the optimizer:
+It does not currently synthesize vendor-native inter-chip operations or perform full timing-aware scheduling. Routing markers are used to estimate communication burden, not to claim executable hardware decomposition.
 
-1. Builds a weighted logical interaction graph from 2-qubit gates
-2. Generates a topology-aware initial qubit layout using graph communities
-3. Refines layout with fast local move/swap search
-4. Produces an abstract routed circuit with explicit inter-chip communication-hop markers
-5. Reports communication cost, hop count, routing latency, and modeled success probability
+Optimization pipeline
+1. Interaction graph extraction
+Convert the circuit into a weighted graph where edge weights reflect repeated 2-qubit interactions.
 
-## Why this matters
+2. Topology-aware community initialization
+Cluster highly interacting qubits and assign them to chips using a capacity-constrained, topology-aware heuristic.
 
-In modular quantum hardware, not all remote 2-qubit interactions are equally expensive.
+3. Fast local refinement
+Improve placement using move/swap local search under chip-capacity constraints.
 
-A placement that reduces:
-- inter-chip gates
-- chip-to-chip communication hops
-- path latency
-- path-induced fidelity loss
+4. Abstract path-aware routing
+Insert one communication-hop marker per traversed chip-to-chip edge for remote interactions.
 
-can significantly improve execution quality compared to naive mapping.
+5. Metric reporting
+Report:
 
-## Current model
+communication cost
+inter-chip gate count
+total inter-chip hop count
+total modeled routing latency
+average hops per remote gate
+average latency per remote gate
+modeled success probability
+Example benchmark results
+Benchmarks were run on clustered synthetic circuits mapped to 4-chip modular topologies.
 
-This is a **prototype layout + abstract routing framework**, not a hardware-exact transpiler pass.
+Average communication-cost reduction versus naive placement:
 
-It currently supports:
-- arbitrary weighted chip graphs
-- chip capacity constraints
-- communication-cost-aware layout
-- path-aware shortest-hop routing annotations
-- estimated latency/fidelity metrics
-- synthetic benchmark evaluation across multiple topologies
+Full mesh: ~52.6%
+Line: ~58.9%
+Ring: ~58.5%
+These results are based on a simplified chip-level communication and fidelity model and should be interpreted as optimization benchmarks, not hardware execution claims.
 
-## Optimization pipeline
+Public API
+The higher-level wrapper API is:
 
-### 1. Interaction graph extraction
-The circuit is converted into a weighted qubit interaction graph where edge weights reflect repeated 2-qubit interactions.
+ModularLayoutOptimizer.analyze(...)
+ModularLayoutOptimizer.run(...)
+ModularLayoutOptimizer.baseline_report(...)
+Quick start
+Python
 
-### 2. Topology-aware community initialization
-Highly interacting logical qubits are clustered and assigned to chips using a topology-aware community placement heuristic.
+from multichip_optimizer import (
+    build_line_topology,
+    create_clustered_test_circuit,
+    ModularLayoutOptimizer,
+)
 
-### 3. Fast local refinement
-A move/swap local search improves the layout under chip-capacity constraints.
+topology = build_line_topology()
+circuit = create_clustered_test_circuit(
+    num_qubits=120,
+    num_clusters=4,
+    num_gates=400,
+    seed=0,
+)
 
-### 4. Path-aware abstract routing
-For each remote interaction, the tool emits one abstract communication-hop marker per chip-to-chip edge traversed along the shortest hardware path.
+optimizer = ModularLayoutOptimizer(topology=topology, max_passes=10)
+result = optimizer.run(circuit, routing_mode="path")
+optimizer.summarize(result)
+Example script
 
-### 5. Routing overhead accounting
-The optimizer reports:
-- communication cost
-- inter-chip gate count
-- total inter-chip hop count
-- total inter-chip routing latency
-- average hops per remote gate
-- average latency per remote gate
-- modeled success probability
+Bash
 
-## Public-facing API
-
-The cleaner ecosystem-facing wrapper is:
-
-- `ModularLayoutOptimizer.analyze(...)`
-- `ModularLayoutOptimizer.run(...)`
-- `ModularLayoutOptimizer.baseline_report(...)`
-
-## Example benchmark results
-
-Benchmarks were run on 120-qubit clustered synthetic circuits mapped to 4-chip modular topologies.
-
-### Full mesh
-- Communication cost reduction vs naive: **52.57%**
-- Hop reduction vs naive: **70.06%**
-- Average routing latency: **450.00**
-- Average runtime: **0.719 sec**
-
-### Line topology
-- Communication cost reduction vs naive: **58.85%**
-- Hop reduction vs naive: **69.93%**
-- Average routing latency: **701.67**
-- Average runtime: **1.541 sec**
-
-### Ring topology
-- Communication cost reduction vs naive: **58.51%**
-- Hop reduction vs naive: **71.49%**
-- Average routing latency: **576.67**
-- Average runtime: **1.027 sec**
-
-### Success probability trend
-Modeled success probability improved substantially relative to naive placement across all tested topologies.
-
-## Quick start
-
-```bash
 python example_usage.py
