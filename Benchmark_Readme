@@ -13,21 +13,32 @@ This folder contains benchmark outputs for the multi-chip placement and abstract
 ## Experimental setup
 
 These results were generated on clustered synthetic circuits with:
+
 - 120 logical qubits
-- 4 logical clusters
+- 4 logical interaction clusters
 - 400 two-qubit gates
-- 4-chip hardware topologies
+- 4-chip modular hardware topologies
 - multiple random seeds
 
-## Metrics
+## Compared methods
+
+Each benchmark compares:
+
+- naive sequential placement
+- random placement
+- topology-aware initial placement
+- locally refined placement
+
+## Reported metrics
 
 Reported metrics include:
-- communication cost
+
+- weighted communication cost
 - inter-chip gate count
 - inter-chip hop count
 - modeled routing latency
 - modeled success probability
-- refinement runtime
+- local refinement runtime
 
 ## Notes
 
