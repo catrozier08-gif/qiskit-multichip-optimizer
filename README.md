@@ -97,3 +97,48 @@ optimizer = MultiChipPlacementOptimizer(topology, max_passes=10)
 result = optimizer.optimize(circuit, routing_mode="path")
 
 optimizer.summarize_result(result)
+
+Output includes
+initial placement
+refined placement
+placement metrics
+optionally transformed routed circuit
+routing summary
+Main metrics
+Placement metrics:
+
+communication_cost
+inter_chip_gates
+estimated_success_probability
+total_interchip_hops
+Routing summary:
+
+total_interchip_hop_markers
+total_interchip_latency
+total_interchip_fidelity_factor
+average_latency_per_hop
+average_hops_per_interchip_gate
+average_latency_per_interchip_gate
+Notes
+This project currently uses:
+
+synthetic clustered benchmark circuits
+abstract communication-hop routing markers
+simplified latency/fidelity models
+It should be viewed as a field-aware modular placement/routing prototype, suitable for experimentation, benchmarking, and future integration work.
+
+Roadmap
+Planned next steps include:
+
+stronger benchmark suites
+cleaner package/module organization
+improved integration with Qiskit transpiler flow
+richer topology and communication models
+stronger IBM/backend-facing experiments
+Files
+Suggested project structure:
+
+multichip_optimizer.py — core optimizer code
+requirements.txt — dependencies
+benchmark_results/ — CSV summaries and PNG plots
+notebooks/ — experimental notebooks
