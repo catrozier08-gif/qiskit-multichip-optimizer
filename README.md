@@ -1,44 +1,99 @@
-# Qiskit Multi-Chip Optimizer
+# Qiskit Multi-Chip Placement Optimizer
 
-A quantum circuit optimizer and routing tool designed for modular, multi-chip quantum computing architectures like the upcoming **IBM Kookaburra**.
+A hardware-aware qubit placement and abstract routing optimizer for modular multi-chip quantum architectures.
 
-As quantum hardware scales by connecting multiple chips via microwave links (l-couplers), inter-chip 2-qubit gates become the primary bottleneck. They are significantly slower and noisier than intra-chip gates. 
+This project targets a key scaling problem in modular quantum systems: minimizing expensive inter-chip communication while respecting chip capacities and hardware topology.
 
-This tool analyzes the interaction graph of a generic Qiskit `QuantumCircuit` (like VQE or QAOA ansatzes) and uses **NetworkX greedy modularity community detection** to intelligently partition highly-entangled qubit clusters onto the same physical chip.
+## What it does
 
-## Performance 
+Given a `Qiskit QuantumCircuit` and a multi-chip hardware graph, the optimizer:
 
-Tested on a highly entangled 100-qubit scrambled test circuit mapped to a 3-chip topology (34 qubits/chip):
+1. Builds a weighted logical interaction graph from 2-qubit gates
+2. Generates a topology-aware initial qubit placement using graph communities
+3. Refines placement with fast local move/swap search
+4. Produces an abstract routed circuit with explicit inter-chip communication-hop markers
+5. Reports communication cost, hop count, routing latency, and modeled success probability
 
-* **Inter-chip gates:** Reduced from 92 to 35 (**62.0% reduction**)
-* **Estimated Circuit Fidelity:** Improved by **1657%**
+## Why this matters
 
-```text
-Placement Analysis:
-  Qubits per chip: {0: 32, 1: 34, 2: 34}
-  Intra-chip gates per chip: {1: 39, 0: 35, 2: 41}
-  Inter-chip gates: 35
+In modular quantum hardware, not all remote 2-qubit interactions are equally expensive.
 
-4. Results:
-   - Inter-chip gate reduction: 62.0%
-   - Fidelity improvement: 1657.87%
+A placement that reduces:
+- inter-chip gates
+- chip-to-chip communication hops
+- path latency
+- path-induced fidelity loss
 
-How it works
-Analyze: Parses the Qiskit circuit to build a weighted interaction graph of all 2-qubit gates.
-Partition: Uses nx.community.greedy_modularity_communities to find hidden clusters of interacting qubits.
-Bin Packing: Intelligently maps these communities to physical chips based on available qubit capacities.
-Remap: Outputs a mapped circuit with optimized virtual-to-physical qubit assignments.
-Usage
-Simply define your topology and pass your circuit to the optimizer: from multichip_optimizer import MultiChipOptimizer, IBMKookaburraTopology
+can significantly improve execution quality compared to naive mapping.
 
-# 1. Define Topology (e.g., 3 chips, 1386 qubits each)
-topology = IBMKookaburraTopology()
+## Current model
 
-# 2. Initialize Optimizer
-optimizer = MultiChipOptimizer(topology)
+This is a **prototype placement + abstract routing framework**, not a hardware-exact transpiler.
 
-# 3. Optimize Circuit
-optimized_circuit = optimizer.optimize(my_qiskit_circuit)
+It currently supports:
+- arbitrary weighted chip graphs
+- chip capacity constraints
+- communication-cost-aware placement
+- path-aware shortest-hop routing annotations
+- estimated latency/fidelity metrics
+- synthetic benchmark evaluation across multiple topologies
 
-Motivation
-This tool was built to highlight the fundamental fidelity limits of planar 2D multi-chip routing, serving as the software baseline for upcoming topological hardware architecture research.
+## Optimization pipeline
+
+### 1. Interaction graph extraction
+The circuit is converted into a weighted qubit interaction graph where edge weights reflect repeated 2-qubit interactions.
+
+### 2. Topology-aware community initialization
+Highly interacting logical qubits are clustered and assigned to chips using a topology-aware community placement heuristic.
+
+### 3. Fast local refinement
+A move/swap local search improves the placement under chip-capacity constraints.
+
+### 4. Path-aware abstract routing
+For each remote interaction, the tool emits one abstract communication-hop marker per chip-to-chip edge traversed along the shortest hardware path.
+
+### 5. Routing overhead accounting
+The optimizer reports:
+- communication cost
+- inter-chip gate count
+- total inter-chip hop count
+- total inter-chip routing latency
+- average hops per remote gate
+- average latency per remote gate
+- modeled success probability
+
+## Example benchmark results
+
+Benchmarks were run on 120-qubit clustered synthetic circuits mapped to 4-chip modular topologies.
+
+### Full mesh
+- Communication cost reduction vs naive: **52.57%**
+- Hop reduction vs naive: **70.06%**
+- Average routing latency: **450.00**
+- Average runtime: **0.719 sec**
+
+### Line topology
+- Communication cost reduction vs naive: **58.85%**
+- Hop reduction vs naive: **69.93%**
+- Average routing latency: **701.67**
+- Average runtime: **1.541 sec**
+
+### Ring topology
+- Communication cost reduction vs naive: **58.51%**
+- Hop reduction vs naive: **71.49%**
+- Average routing latency: **576.67**
+- Average runtime: **1.027 sec**
+
+### Success probability trend
+Modeled success probability improved substantially relative to naive placement across all tested topologies.
+
+## Example usage
+
+```python
+topology = build_line_topology()
+circuit = create_clustered_test_circuit(num_qubits=120, num_clusters=4, num_gates=400, seed=0)
+
+optimizer = MultiChipPlacementOptimizer(topology, max_passes=10)
+result = optimizer.optimize(circuit, routing_mode="path")
+
+optimizer.summarize_result(result)
