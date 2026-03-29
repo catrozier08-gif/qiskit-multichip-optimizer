@@ -1,4 +1,4 @@
-%%writefile multichip_optimizer.py
+
 import networkx as nx
 import random
 from collections import defaultdict
