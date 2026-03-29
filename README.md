@@ -1,3 +1,5 @@
+Quick start python example_usage.py
+
 # Qiskit Multi-Chip Placement Optimizer
 
 A hardware-aware qubit placement and abstract routing optimizer for modular multi-chip quantum architectures.
@@ -97,6 +99,7 @@ optimizer = MultiChipPlacementOptimizer(topology, max_passes=10)
 result = optimizer.optimize(circuit, routing_mode="path")
 
 optimizer.summarize_result(result)
+
 
 Output includes
 initial placement
