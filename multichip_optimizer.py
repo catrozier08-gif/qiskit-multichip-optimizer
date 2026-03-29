@@ -717,6 +717,136 @@ class MultiChipPlacementOptimizer:
         ref_cost = result["refined_metrics"]["communication_cost"]
         improvement = (1 - ref_cost / init_cost) * 100 if init_cost > 0 else 0.0
 
+        # =========================================================
+# TOPOLOGY DESCRIPTION HELPER
+# =========================================================
+
+def describe_topology(topology: MultiChipTopology) -> Dict:
+    latencies = []
+    fidelities = []
+    links = []
+    
+    for u, v, data in topology.chip_graph.edges(data=True):
+        lat = data.get("latency", None)
+        fid = data.get("fidelity", None)
+        if lat is not None:
+            latencies.append(lat)
+        if fid is not None:
+            fidelities.append(fid)
+        links.append({
+            "chip_a": u,
+            "chip_b": v,
+            "latency": lat,
+            "fidelity": fid,
+            "bandwidth": data.get("bandwidth", None),
+        })
+    
+    return {
+        "num_chips": topology.num_chips,
+        "qubits_per_chip": topology.qubits_per_chip,
+        "total_qubit_capacity": sum(topology.qubits_per_chip),
+        "num_links": topology.chip_graph.number_of_edges(),
+        "average_link_latency": sum(latencies) / len(latencies) if latencies else None,
+        "average_link_fidelity": sum(fidelities) / len(fidelities) if fidelities else None,
+        "links": links,
+    }
+
+
+# =========================================================
+# ECOSYSTEM-FACING WRAPPER
+# =========================================================
+
+class ModularLayoutOptimizer:
+    """
+    Transpiler-adjacent wrapper for modular quantum layout optimization.
+    
+    This class presents a cleaner ecosystem-facing API around the underlying
+    multi-chip placement and abstract routing engine.
+    """
+    
+    def __init__(self, topology: MultiChipTopology, max_passes: int = 10):
+        self.topology = topology
+        self.max_passes = max_passes
+        self.engine = MultiChipPlacementOptimizer(topology=topology, max_passes=max_passes)
+    
+    def analyze(self, circuit: QuantumCircuit) -> Dict:
+        interaction_graph = self.engine.build_interaction_graph(circuit)
+        return {
+            "num_qubits": circuit.num_qubits,
+            "num_operations": len(circuit.data),
+            "num_interaction_edges": interaction_graph.number_of_edges(),
+            "interaction_graph": interaction_graph,
+            "topology": describe_topology(self.topology),
+        }
+    
+    def run(self, circuit: QuantumCircuit, routing_mode: str = "path") -> Dict:
+        result = self.engine.optimize(circuit, routing_mode=routing_mode)
+        
+        wrapped = {
+            "topology": describe_topology(self.topology),
+            "routing_mode": routing_mode,
+            "interaction_graph": result["interaction_graph"],
+            "initial_layout": result["initial_placement"],
+            "refined_layout": result["refined_placement"],
+            "initial_metrics": result["initial_metrics"],
+            "refined_metrics": result["refined_metrics"],
+        }
+        
+        if "optimized_circuit" in result:
+            wrapped["routed_circuit"] = result["optimized_circuit"]
+        
+        if "routing_summary" in result:
+            wrapped["routing_summary"] = result["routing_summary"]
+        
+        return wrapped
+    
+    def baseline_report(self, circuit: QuantumCircuit) -> Dict:
+        interaction_graph = self.engine.build_interaction_graph(circuit)
+        baselines = self.engine.compare_baselines(interaction_graph)
+        
+        return {
+            "topology": describe_topology(self.topology),
+            "baselines": baselines,
+        }
+    
+    def summarize(self, result: Dict):
+        print("Modular Layout Optimizer Summary")
+        print("-" * 50)
+        
+        topo = result.get("topology", {})
+        print(f"Topology: {topo.get('num_chips')} chips, capacity {topo.get('total_qubit_capacity')} qubits")
+        print(f"Links: {topo.get('num_links')} | Avg latency: {topo.get('average_link_latency')} | Avg fidelity: {topo.get('average_link_fidelity')}")
+        
+        print("\nInitial Layout Metrics:")
+        for k, v in result["initial_metrics"].items():
+            print(f"  {k}: {v}")
+        
+        print("\nRefined Layout Metrics:")
+        for k, v in result["refined_metrics"].items():
+            print(f"  {k}: {v}")
+        
+        init_cost = result["initial_metrics"]["communication_cost"]
+        ref_cost = result["refined_metrics"]["communication_cost"]
+        improvement = (1 - ref_cost / init_cost) * 100 if init_cost > 0 else 0.0
+        
+        print(f"\nRefinement improvement over initial layout: {improvement:.2f}%")
+        
+        if "routing_summary" in result:
+            print("\nRouting Summary:")
+            for k, v in result["routing_summary"].items():
+                print(f"  {k}: {v}")
+        
+        if "routed_circuit" in result:
+            routed_circuit = result["routed_circuit"]
+            print(f"\nRouted circuit operations: {len(routed_circuit.data)}")
+            interchip_hops = sum(1 for instr in routed_circuit.data if instr.operation.name == "interchip_hop")
+            interchip_comm = sum(1 for instr in routed_circuit.data if instr.operation.name == "interchip_comm")
+            
+            if interchip_hops:
+                print(f"Inserted inter-chip hop markers: {interchip_hops}")
+            if interchip_comm:
+                print(f"Inserted inter-chip communication markers: {interchip_comm}")
+
         print(f"\nRefinement improvement over initial placement: {improvement:.2f}%")
 
         if "routing_summary" in result and result["routing_summary"]:
